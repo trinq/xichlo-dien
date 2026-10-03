@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Smoke Test — XÍCH LÔ ĐIÊN</title>
+  <style>
+    body { font-family: monospace; background: #111; color: #0f0; padding: 20px; }
+    .pass { color: #4f4; }
+    .fail { color: #f44; font-weight: bold; }
+    pre { background: #000; padding: 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Smoke Test — XÍCH LÔ ĐIÊN MVP</h1>
+  <div id="status">Running...</div>
+  <pre id="log"></pre>
+
+  <iframe id="game" src="../index.html" width="800" height="450" style="border:1px solid #444;"></iframe>
+
+  <script>
+    const log = document.getElementById('log');
+    const status = document.getElementById('status');
+    const errs = [];
+    const results = [];
+
+    function check(name, ok, detail) {
+      results.push({ name, ok, detail });
+      log.innerHTML += `<span class="${ok ? 'pass' : 'fail'}">[${ok ? 'PASS' : 'FAIL'}]</span> ${name}${detail ? ' — ' + detail : ''}\n`;
+    }
+
+    const iframe = document.getElementById('game');
+    iframe.addEventListener('load', () => {
+      setTimeout(() => {
+        try {
+          const win = iframe.contentWindow;
+          const doc = iframe.contentDocument;
+
+          // 1. No console errors
+          if (errs.length === 0) {
+            check('No console errors on load', true);
+          } else {
+            check('No console errors on load', false, errs.join('; '));
+          }
+
+          // 2. Canvas exists and has non-zero size
+          const canvas = doc.getElementById('game-canvas');
+          if (canvas && canvas.width > 0 && canvas.height > 0) {
+            check('Canvas exists with non-zero size', true, `${canvas.width}x${canvas.height}`);
+          } else {
+            check('Canvas exists with non-zero size', false);
+          }
+
+          // 3. Game instance exposed
+          if (win.__game && win.__game.renderer) {
+            check('Game instance exposed on window', true);
+          } else {
+            check('Game instance exposed on window', false);
+          }
+
+          // 4. Renderer has rendered at least one frame (check scene child count > 0)
+          if (win.__game && win.__game.scene && win.__game.scene.children.length > 0) {
+            check('Scene has children (ground/light)', true, `${win.__game.scene.children.length} objects`);
+          } else {
+            check('Scene has children (ground/light)', false);
+          }
+
+          // 5. Menu visible before start
+          const menu = doc.getElementById('menu');
+          if (menu && menu.style.display !== 'none') {
+            check('Menu visible at boot', true);
+          } else {
+            check('Menu visible at boot', false);
+          }
+
+          // 6. Click "BẮT ĐẦU" enters gameplay
+          const btn = doc.getElementById('start-btn');
+          if (btn) {
+            btn.click();
+            setTimeout(() => {
+              if (menu.style.display === 'none') {
+                check('Click BẮT ĐẦU hides menu', true);
+              } else {
+                check('Click BẮT ĐẦU hides menu', false);
+              }
+              if (doc.getElementById('hud').style.display === 'block') {
+                check('HUD shown after start', true);
+              } else {
+                check('HUD shown after start', false);
+              }
+
+              // 7. FPS counter ticking
+              setTimeout(() => {
+                const fpsText = doc.getElementById('fps').textContent;
+                if (fpsText.includes('FPS:') && !fpsText.includes('--')) {
+                  check('FPS counter ticking', true, fpsText);
+                } else {
+                  check('FPS counter ticking', false, fpsText);
+                }
+
+                // Summary
+                const passed = results.filter(r => r.ok).length;
+                const total = results.length;
+                status.innerHTML = passed === total
+                  ? `<span class="pass">MVP OK — ${passed}/${total} checks passed</span>`
+                  : `<span class="fail">MVP FAIL — ${passed}/${total} checks passed</span>`;
+              }, 1500);
+            }, 200);
+          }
+        } catch (e) {
+          check('Smoke test execution', false, e.message);
+          status.innerHTML = `<span class="fail">MVP FAIL — error: ${e.message}</span>`;
+        }
+      }, 500);
+    });
+
+    // Capture console errors from iframe
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'console.error') {
+        errs.push(e.data.msg);
+      }
+    });
+  </script>
+</body>
+</html>
