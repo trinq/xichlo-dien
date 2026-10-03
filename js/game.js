@@ -58,6 +58,14 @@ export class Game {
     this.gameplayStarted = false;
     this.currentScene = 'boot';
 
+    // Input system (Ticket 03)
+    import('./systems/InputSystem.js').then((mod) => {
+      this.input = new mod.InputSystem(window);
+      console.log('[Game] InputSystem ready');
+    }).catch((err) => {
+      console.error('[Game] InputSystem FAILED:', err);
+    });
+
     // Handle resize
     window.addEventListener('resize', () => this._onResize());
   }
@@ -68,6 +76,7 @@ export class Game {
       this._update(dt);
       this._render();
       this._updateFps(dt);
+      this._postFrame();
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -85,6 +94,11 @@ export class Game {
 
   _render() {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  _postFrame() {
+    // Clear edge-triggered input states at end of frame
+    if (this.input) this.input.endFrame();
   }
 
   _onResize() {

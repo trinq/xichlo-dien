@@ -28,6 +28,54 @@
       log.innerHTML += `<span class="${ok ? 'pass' : 'fail'}">[${ok ? 'PASS' : 'FAIL'}]</span> ${name}${detail ? ' — ' + detail : ''}\n`;
     }
 
+    function runInputTests(win, doc) {
+      if (!win.__game || !win.__game.input) {
+        // Retry once after 500ms (InputSystem is dynamically imported)
+        setTimeout(() => runInputTests(win, doc), 500);
+        return;
+      }
+      check('InputSystem created in Game', true);
+
+      const input = win.__game.input;
+      // Test isDown via direct set (since synthetic events on window are tricky in iframe)
+      // We dispatch events on the iframe's window
+      const fakeEvent = (type, code) => new win.KeyboardEvent(type, { code, bubbles: true });
+
+      win.dispatchEvent(fakeEvent('keydown', 'KeyW'));
+      check('isDown("KeyW") after keydown', input.isDown('KeyW'));
+      check('wasPressed("KeyW") edge-trigger', input.wasPressed('KeyW'));
+
+      // Hold: wasPressed should be true only on the frame of press
+      input.endFrame();
+      check('wasPressed("KeyW") false after endFrame while held', !input.wasPressed('KeyW'));
+      check('isDown("KeyW") still true while held', input.isDown('KeyW'));
+
+      // Release
+      win.dispatchEvent(fakeEvent('keyup', 'KeyW'));
+      check('isDown("KeyW") false after keyup', !input.isDown('KeyW'));
+      check('wasReleased("KeyW") edge-trigger', input.wasReleased('KeyW'));
+
+      // Mouse
+      win.dispatchEvent(new win.MouseEvent('mousemove', { clientX: 400, clientY: 225, bubbles: true }));
+      check('mouseNdc.x ~= 0 at mid-screen', Math.abs(input.mouseNdc.x) < 0.01,
+            `ndc.x=${input.mouseNdc.x.toFixed(3)}`);
+
+      win.dispatchEvent(new win.MouseEvent('mousedown', { button: 0, bubbles: true }));
+      check('mouseDown true after mousedown', input.mouseDown);
+      check('mousePressed edge-trigger', input.mousePressed);
+      input.endFrame();
+      win.dispatchEvent(new win.MouseEvent('mouseup', { button: 0, bubbles: true }));
+      check('mouseDown false after mouseup', !input.mouseDown);
+      check('mouseReleased edge-trigger', input.mouseReleased);
+
+      // update summary
+      const passed = results.filter(r => r.ok).length;
+      const total = results.length;
+      status.innerHTML = passed === total
+        ? `<span class="pass">MVP OK — ${passed}/${total} checks passed</span>`
+        : `<span class="fail">MVP FAIL — ${passed}/${total} checks passed</span>`;
+    }
+
     const iframe = document.getElementById('game');
     iframe.addEventListener('load', () => {
       setTimeout(() => {
@@ -119,6 +167,9 @@
                         check('loadVehicle() returns Group for 5 types', allOk,
                               allOk ? 'all 5 loaded' : failDetails.join('; '));
 
+                        // === Ticket 03 tests: input system ===
+                        runInputTests(win, doc);
+
                         // === Final summary ===
                         const passed = results.filter(r => r.ok).length;
                         const total = results.length;
@@ -131,6 +182,7 @@
                       failDetails.push(`${t}: ${e.message}`);
                       if (--pending === 0) {
                         check('loadVehicle() returns Group for 5 types', false, failDetails.join('; '));
+                        runInputTests(win, doc);
                         const passed = results.filter(r => r.ok).length;
                         const total = results.length;
                         status.innerHTML = `<span class="fail">MVP FAIL — ${passed}/${total}</span>`;
@@ -139,6 +191,7 @@
                   });
                 } else {
                   check('Assets module exposed on window', false, 'window.__assets missing');
+                  runInputTests(win, doc);
                   const passed = results.filter(r => r.ok).length;
                   const total = results.length;
                   status.innerHTML = `<span class="fail">MVP FAIL — ${passed}/${total}</span>`;
