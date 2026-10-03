@@ -15,6 +15,11 @@ window.addEventListener('DOMContentLoaded', () => {
     game.startGameplay();
   });
 
+  // Ticket 02: expose asset loader for testing
+  import('./js/assets.js').then((mod) => {
+    window.__assets = mod;
+  });
+
   // Expose for smoke test
   window.__game = game;
 });

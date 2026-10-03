@@ -97,12 +97,52 @@
                   check('FPS counter ticking', false, fpsText);
                 }
 
-                // Summary
-                const passed = results.filter(r => r.ok).length;
-                const total = results.length;
-                status.innerHTML = passed === total
-                  ? `<span class="pass">MVP OK — ${passed}/${total} checks passed</span>`
-                  : `<span class="fail">MVP FAIL — ${passed}/${total} checks passed</span>`;
+                // === Ticket 02 tests: asset loader ===
+                if (win.__assets && win.__assets.loadVehicle) {
+                  const types = ['car', 'motorcycle', 'cyclo', 'bagaxi', 'truck'];
+                  let pending = types.length;
+                  let allOk = true;
+                  const failDetails = [];
+                  types.forEach((t) => {
+                    win.__assets.loadVehicle(t).then((mesh) => {
+                      if (!mesh || !mesh.isGroup) {
+                        allOk = false;
+                        failDetails.push(`${t}: not a Group`);
+                      } else if (mesh.children.length < 2) {
+                        allOk = false;
+                        failDetails.push(`${t}: only ${mesh.children.length} children`);
+                      } else if (!mesh.userData.colliderSize || !mesh.userData.colliderSize.x) {
+                        allOk = false;
+                        failDetails.push(`${t}: no colliderSize`);
+                      }
+                      if (--pending === 0) {
+                        check('loadVehicle() returns Group for 5 types', allOk,
+                              allOk ? 'all 5 loaded' : failDetails.join('; '));
+
+                        // === Final summary ===
+                        const passed = results.filter(r => r.ok).length;
+                        const total = results.length;
+                        status.innerHTML = passed === total
+                          ? `<span class="pass">MVP OK — ${passed}/${total} checks passed</span>`
+                          : `<span class="fail">MVP FAIL — ${passed}/${total} checks passed</span>`;
+                      }
+                    }).catch((e) => {
+                      allOk = false;
+                      failDetails.push(`${t}: ${e.message}`);
+                      if (--pending === 0) {
+                        check('loadVehicle() returns Group for 5 types', false, failDetails.join('; '));
+                        const passed = results.filter(r => r.ok).length;
+                        const total = results.length;
+                        status.innerHTML = `<span class="fail">MVP FAIL — ${passed}/${total}</span>`;
+                      }
+                    });
+                  });
+                } else {
+                  check('Assets module exposed on window', false, 'window.__assets missing');
+                  const passed = results.filter(r => r.ok).length;
+                  const total = results.length;
+                  status.innerHTML = `<span class="fail">MVP FAIL — ${passed}/${total}</span>`;
+                }
               }, 1500);
             }, 200);
           }
